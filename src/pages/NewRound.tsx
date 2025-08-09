@@ -127,7 +127,7 @@ const NewRound: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validateForm() || !selectedCourse) {
       return;
     }
 
@@ -149,7 +149,8 @@ const NewRound: React.FC = () => {
         winner: winner.uid,
         holeCount: selectedCourse.holes || 18,
         par: selectedCourse.par || 72,
-        location: selectedCourse.location
+        location: selectedCourse.location || { address: '', lat: 0, lng: 0 },
+        createdAt: new Date()
       };
 
       await createRound(roundData);

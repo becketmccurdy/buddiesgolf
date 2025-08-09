@@ -26,6 +26,7 @@ const Navigation: React.FC = () => {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
     { path: '/new-round', label: 'New Round', icon: '🏌️' },
+    { path: '/courses/new', label: 'Create Course', icon: '🏗️' },
     { path: '/history', label: 'History', icon: '📊' },
     { path: '/profile', label: 'Profile', icon: '👤' }
   ];

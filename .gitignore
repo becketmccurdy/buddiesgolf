@@ -99,3 +99,7 @@ Desktop.ini
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+.vercel
+
+# Local Netlify folder
+.netlify

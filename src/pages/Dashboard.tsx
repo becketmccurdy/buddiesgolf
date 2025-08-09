@@ -259,7 +259,9 @@ const Dashboard: React.FC = () => {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="font-bold text-gray-900 text-lg">{round.course}</h3>
+                            <h3 className="font-bold text-gray-900 text-lg">
+                              {typeof round.course === 'string' ? round.course : round.course?.name || 'Unknown Course'}
+                            </h3>
                             {index === 0 && (
                               <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
                                 Latest

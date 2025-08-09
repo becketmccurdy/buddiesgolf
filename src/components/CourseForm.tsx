@@ -121,6 +121,7 @@ const CourseForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
     
     if (!currentUser) {
       console.error('User must be logged in');
+      setMapError('You must be logged in to save a course');
       return;
     }
 
@@ -130,23 +131,59 @@ const CourseForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
       return;
     }
 
-    if (!formData.location.address) {
+    if (!formData.location?.address) {
       setMapError('Please select a location for the course');
       return;
     }
 
+    if (!formData.holes) {
+      setMapError('Please specify the number of holes');
+      return;
+    }
+
+    if (!formData.par) {
+      setMapError('Please specify the par for the course');
+      return;
+    }
+
+    // Ensure location has all required fields
+    const location = {
+      address: formData.location.address || '',
+      lat: formData.location.lat || 0,
+      lng: formData.location.lng || 0
+    };
+
+    // Prepare course data with proper types
+    const courseData = {
+      ...formData,
+      location,
+      holes: Number(formData.holes),
+      par: Number(formData.par),
+      rating: formData.rating ? Number(formData.rating) : undefined,
+      slope: formData.slope ? Number(formData.slope) : undefined,
+      amenities: formData.amenities || []
+    };
+
+    console.log('Submitting course data:', courseData);
+
     setIsSubmitting(true);
+    setMapError(null);
 
     try {
       if (isEdit && courseId) {
-        await updateExistingCourse(courseId, formData);
+        console.log('Updating course with ID:', courseId);
+        await updateExistingCourse(courseId, courseData);
+        console.log('Course updated successfully');
       } else {
-        await createNewCourse(formData);
+        console.log('Creating new course');
+        const newCourseId = await createNewCourse(courseData);
+        console.log('Course created with ID:', newCourseId);
       }
       navigate('/courses');
     } catch (err) {
       console.error('Error saving course:', err);
-      setMapError('Failed to save course. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save course. Please try again.';
+      setMapError(`Error: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -172,22 +209,61 @@ const CourseForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
     });
   };
 
-  useEffect(() => {
-    // Load Google Maps API
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.onload = () => {
-      initAutocomplete();
-    };
-    script.onerror = () => {
-      console.error('Error loading Google Maps API');
-      setMapError('Error loading map. Please refresh the page and try again.');
-    };
-    document.head.appendChild(script);
+  const scriptLoaded = React.useRef(false);
 
+  useEffect(() => {
+    // Skip if script is already loaded or being loaded
+    if (scriptLoaded.current) return;
+    
+    // Check if Google Maps is already available
+    if (window.google?.maps?.places) {
+      initAutocomplete();
+      return;
+    }
+
+    // Check if script is already in the document
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', initAutocomplete);
+      return () => {
+        existingScript.removeEventListener('load', initAutocomplete);
+      };
+    }
+
+    // Load the script if not already present
+    const loadGoogleMaps = () => {
+      const script = document.createElement('script');
+      const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey) {
+        console.error('Google Maps API key is not defined');
+        setMapError('Google Maps API key is missing. Please check your configuration.');
+        return;
+      }
+
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        scriptLoaded.current = true;
+        initAutocomplete();
+      };
+      script.onerror = (error) => {
+        console.error('Error loading Google Maps:', error);
+        setMapError('Failed to load Google Maps. Please check your internet connection and API key.');
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+
+    // Cleanup function
     return () => {
-      document.head.removeChild(script);
+      // Remove any event listeners if the component unmounts
+      const scripts = document.querySelectorAll('script[src*="maps.googleapis.com/maps/api/js"]');
+      scripts.forEach(script => {
+        script.removeEventListener('load', initAutocomplete);
+      });
     };
   }, []);
 

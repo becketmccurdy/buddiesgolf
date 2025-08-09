@@ -39,9 +39,10 @@ const RoundHistory: React.FC = () => {
     let filtered = rounds;
 
     if (courseFilter) {
-      filtered = filtered.filter(round => 
-        round.course.toLowerCase().includes(courseFilter.toLowerCase())
-      );
+      filtered = filtered.filter(round => {
+        const courseName = typeof round.course === 'string' ? round.course : round.course.name;
+        return courseName.toLowerCase().includes(courseFilter.toLowerCase());
+      });
     }
 
     if (playerFilter) {
@@ -89,7 +90,10 @@ const RoundHistory: React.FC = () => {
   };
 
   const getUniqueCourses = () => {
-    return [...new Set(rounds.map(round => round.course))];
+    const courses = rounds.map(round => 
+      typeof round.course === 'string' ? round.course : round.course.name
+    );
+    return [...new Set(courses)] as string[];
   };
 
   const getUniqueDates = () => {
@@ -183,7 +187,7 @@ const RoundHistory: React.FC = () => {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900">
-                      {round.course}
+                      {typeof round.course === 'string' ? round.course : round.course.name}
                     </h3>
                     <p className="text-gray-600">
                       {formatDate(round.date)} • {round.players.length} players

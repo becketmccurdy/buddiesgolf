@@ -48,6 +48,14 @@ const AppRoutes: React.FC = () => {
         } 
       />
       <Route 
+        path="/courses/new" 
+        element={
+          <ProtectedRoute>
+            <CourseForm />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
         path="/history" 
         element={
           <ProtectedRoute>

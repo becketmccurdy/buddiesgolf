@@ -22,6 +22,7 @@ const CourseDetailPage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const scriptLoaded = React.useRef(false);
 
   useEffect(() => {
     if (courseId) {
@@ -30,25 +31,74 @@ const CourseDetailPage: React.FC = () => {
   }, [courseId, fetchCourse]);
 
   useEffect(() => {
-    // Load Google Maps API if we have a course with location
-    if (currentCourse?.location?.lat && currentCourse?.location?.lng) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`;
-      script.async = true;
-      script.onload = () => {
-        initMap();
-        setIsMapLoaded(true);
-      };
-      script.onerror = () => {
-        console.error('Error loading Google Maps API');
-        setMapError('Error loading map. Please refresh the page and try again.');
-      };
-      document.head.appendChild(script);
+    // Skip if no course or no location
+    if (!currentCourse?.location?.lat || !currentCourse?.location?.lng) return;
+    
+    // Skip if script is already loaded or being loaded
+    if (scriptLoaded.current) {
+      initMap();
+      return;
+    }
+    
+    // Check if Google Maps is already available
+    if (window.google?.maps) {
+      scriptLoaded.current = true;
+      initMap();
+      return;
+    }
 
+    // Check if script is already in the document
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existingScript) {
+      const onScriptLoad = () => {
+        scriptLoaded.current = true;
+        initMap();
+      };
+      
+      existingScript.addEventListener('load', onScriptLoad);
       return () => {
-        document.head.removeChild(script);
+        existingScript.removeEventListener('load', onScriptLoad);
       };
     }
+
+    // Load the script if not already present
+    const loadGoogleMaps = () => {
+      const script = document.createElement('script');
+      const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey) {
+        console.error('Google Maps API key is not defined');
+        setMapError('Google Maps API key is missing. Please check your configuration.');
+        return;
+      }
+
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+      script.async = true;
+      script.defer = true;
+      
+      const onScriptLoad = () => {
+        scriptLoaded.current = true;
+        initMap();
+      };
+      
+      script.onload = onScriptLoad;
+      script.onerror = (error) => {
+        console.error('Error loading Google Maps:', error);
+        setMapError('Failed to load Google Maps. Please check your internet connection and API key.');
+      };
+      
+      document.head.appendChild(script);
+      
+      // Cleanup function
+      return () => {
+        script.removeEventListener('load', onScriptLoad);
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
+    };
+
+    return loadGoogleMaps();
   }, [currentCourse]);
 
   const initMap = () => {

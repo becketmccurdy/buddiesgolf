@@ -147,14 +147,56 @@ export const getAllUsers = async (): Promise<User[]> => {
 
 // Course functions
 export const createCourse = async (courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<string> => {
-  const courseRef = await addDoc(collection(db, 'courses'), {
-    ...courseData,
-    createdBy: userId,
-    isPublic: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  });
-  return courseRef.id;
+  try {
+    console.log('1. Starting createCourse with data:', JSON.stringify(courseData, null, 2));
+    console.log('2. User ID:', userId);
+    
+    if (!userId) {
+      throw new Error('User ID is required to create a course');
+    }
+    
+    // Ensure required fields are present
+    const requiredFields = ['name', 'location', 'holes', 'par'];
+    const missingFields = requiredFields.filter(field => !(field in courseData));
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    }
+    
+    // Prepare course data with timestamps
+    const courseWithTimestamps = {
+      ...courseData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: userId,
+      // Ensure these fields have default values if not provided
+      isPublic: courseData.isPublic || false,
+      amenities: courseData.amenities || [],
+      rating: courseData.rating || 0,
+      slope: courseData.slope || 0
+    };
+    
+    console.log('3. Course data with timestamps:', JSON.stringify(courseWithTimestamps, null, 2));
+    
+    // Add the course to Firestore
+    const courseRef = await addDoc(collection(db, 'courses'), courseWithTimestamps);
+    
+    if (!courseRef.id) {
+      throw new Error('Failed to get course ID after creation');
+    }
+    
+    console.log('4. Course created successfully with ID:', courseRef.id);
+    return courseRef.id;
+  } catch (error) {
+    console.error('Error in createCourse:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      courseData: JSON.stringify(courseData, null, 2),
+      userId
+    });
+    throw new Error(`Failed to create course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 export const getCourse = async (courseId: string): Promise<Course | null> => {
@@ -198,11 +240,23 @@ export const getCourses = async (options: {
 };
 
 export const updateCourse = async (courseId: string, updates: Partial<Course>) => {
-  const courseRef = doc(db, 'courses', courseId);
-  await updateDoc(courseRef, {
-    ...updates,
-    updatedAt: new Date()
-  });
+  console.log('Firebase: Updating course:', courseId, 'with data:', updates);
+  try {
+    const updateData = {
+      ...updates,
+      updatedAt: Timestamp.now()
+    };
+    console.log('Firebase: Update data with timestamp:', updateData);
+    
+    const courseRef = doc(db, 'courses', courseId);
+    console.log('Firebase: Course reference:', courseRef.path);
+    
+    await updateDoc(courseRef, updateData);
+    console.log('Firebase: Course updated successfully');
+  } catch (error) {
+    console.error('Firebase: Error updating course:', error);
+    throw new Error(`Failed to update course: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 export const deleteCourse = async (courseId: string) => {

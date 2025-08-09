@@ -46,15 +46,41 @@ declare namespace google.maps {
     title?: string;
   }
 
-  class places {
-    static Autocomplete: typeof Autocomplete;
+  namespace places {
+    interface PlaceResult {
+      address_components?: AddressComponent[];
+      formatted_address?: string;
+      geometry?: {
+        location: google.maps.LatLng;
+        viewport: google.maps.LatLngBounds;
+      };
+      name?: string;
+      formatted_phone_number?: string;
+      international_phone_number?: string;
+      website?: string;
+      rating?: number;
+      user_ratings_total?: number;
+      types?: string[];
+      url?: string;
+      vicinity?: string;
+      [key: string]: any;
+    }
+
+    class PlacesService {
+      constructor(attrContainer: HTMLElement | Map);
+      getDetails(request: { placeId: string; fields?: string[] }, callback: (place: PlaceResult, status: string) => void): void;
+    }
+
+    class Autocomplete extends google.maps.MVCObject {
+      constructor(inputField: HTMLInputElement, opts?: AutocompleteOptions);
+      addListener(eventName: string, handler: Function): google.maps.MapsEventListener;
+      getPlace(): PlaceResult;
+      setFields(fields: string[]): void;
+      setComponentRestrictions(restrictions: ComponentRestrictions): void;
+    }
   }
 
-  class Autocomplete extends google.maps.MVCObject {
-    constructor(inputField: HTMLInputElement, opts?: AutocompleteOptions);
-    addListener(eventName: string, handler: Function): google.maps.MapsEventListener;
-    getPlace(): PlaceResult;
-  }
+  // Moved Autocomplete class inside the places namespace
 
   interface AutocompleteOptions {
     types?: string[];
@@ -66,22 +92,7 @@ declare namespace google.maps {
     country: string | string[];
   }
 
-  interface PlaceResult {
-    address_components?: AddressComponent[];
-    formatted_address?: string;
-    geometry?: PlaceGeometry;
-    name?: string;
-    formatted_phone_number?: string;
-    international_phone_number?: string;
-    website?: string;
-    opening_hours?: OpeningHours;
-    photos?: PlacePhoto[];
-    rating?: number;
-    user_ratings_total?: number;
-    types?: string[];
-    url?: string;
-    vicinity?: string;
-  }
+  // Moved PlaceResult interface inside the google.maps.places namespace
 
   interface AddressComponent {
     long_name: string;
