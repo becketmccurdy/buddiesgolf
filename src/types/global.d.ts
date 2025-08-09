@@ -1,5 +1,9 @@
 // Type definitions for Google Maps JavaScript API
 declare namespace google.maps {
+  // Extend the global window object to include Google Maps
+  interface Window {
+    google: typeof google;
+  }
   class Map {
     constructor(mapDiv: HTMLElement | null, opts?: MapOptions);
     setCenter(latLng: LatLng | LatLngLiteral): void;
@@ -75,24 +79,26 @@ declare namespace google.maps {
     country: string | string[];
   }
 
-  // PlaceResult interface
-  interface PlaceResult {
-    address_components?: AddressComponent[];
-    formatted_address?: string;
-    geometry?: {
-      location: LatLng;
-      viewport: LatLngBounds;
-    };
-    name?: string;
-    formatted_phone_number?: string;
-    international_phone_number?: string;
-    website?: string;
-    rating?: number;
-    user_ratings_total?: number;
-    types?: string[];
-    url?: string;
-    vicinity?: string;
-    [key: string]: any;
+  // PlaceResult interface for Google Maps Places API
+  namespace places {
+    interface PlaceResult {
+      address_components?: google.maps.GeocoderAddressComponent[];
+      formatted_address?: string;
+      geometry?: {
+        location: google.maps.LatLng | google.maps.LatLngLiteral;
+        viewport: google.maps.LatLngBounds;
+      };
+      name?: string;
+      formatted_phone_number?: string;
+      international_phone_number?: string;
+      website?: string;
+      rating?: number;
+      user_ratings_total?: number;
+      types?: string[];
+      url?: string;
+      vicinity?: string;
+      [key: string]: any;
+    }
   }
 
   interface AddressComponent {

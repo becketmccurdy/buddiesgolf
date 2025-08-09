@@ -82,15 +82,34 @@ const CourseForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
 
   const handleLocationSelect = (place: google.maps.places.PlaceResult | null) => {
     if (!place) return;
-    if (!place.geometry || !place.geometry.location) {
+    
+    // Safely access the location data
+    const location = place.geometry?.location;
+    if (!location) {
       setMapError('Could not find location. Please try again.');
       return;
     }
 
-    const locationData = {
+    // Get the coordinates, handling both LatLng object and LatLngLiteral
+    let lat: number;
+    let lng: number;
+
+    if (typeof location.lat === 'function') {
+      // It's a LatLng object
+      const latLng = location as google.maps.LatLng;
+      lat = latLng.lat();
+      lng = latLng.lng();
+    } else {
+      // It's a LatLngLiteral
+      const latLng = location as google.maps.LatLngLiteral;
+      lat = latLng.lat;
+      lng = latLng.lng;
+    }
+
+    const locationData: Location = {
       address: place.formatted_address || '',
-      lat: place.geometry.location.lat(),
-      lng: place.geometry.location.lng(),
+      lat,
+      lng,
     };
 
     setFormData(prev => ({
