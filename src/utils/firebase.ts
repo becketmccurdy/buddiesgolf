@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, PhoneAuthProvider, signInWithPopup, signInWithPhoneNumber, RecaptchaVerifier } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -39,14 +39,41 @@ export interface User {
   };
 }
 
+// Course types
+export interface Location {
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface Course {
+  id?: string;
+  name: string;
+  location: Location;
+  holes: number;
+  par: number;
+  rating?: number;
+  slope?: number;
+  amenities?: string[];
+  phone?: string;
+  website?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdBy: string;
+  isPublic: boolean;
+}
+
 // Round types
 export interface Round {
   id?: string;
-  course: string;
+  courseId: string;
+  courseName: string;
+  course: Course | string; // Full course data or just the name for backward compatibility
   date: string;
   location?: {
     lat: number;
     lng: number;
+    address?: string;
   };
   players: string[];
   scores: {
@@ -54,6 +81,8 @@ export interface Round {
     holes: number[];
   }[];
   winner?: string;
+  holeCount: number;
+  par: number;
   createdAt: Date;
 }
 
@@ -114,6 +143,71 @@ export const getAllUsers = async (): Promise<User[]> => {
   const usersSnap = await getDocs(usersRef);
   
   return usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as User);
+};
+
+// Course functions
+export const createCourse = async (courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<string> => {
+  const courseRef = await addDoc(collection(db, 'courses'), {
+    ...courseData,
+    createdBy: userId,
+    isPublic: false,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+  return courseRef.id;
+};
+
+export const getCourse = async (courseId: string): Promise<Course | null> => {
+  const courseRef = doc(db, 'courses', courseId);
+  const courseSnap = await getDoc(courseRef);
+  
+  if (courseSnap.exists()) {
+    return { id: courseId, ...courseSnap.data() } as Course;
+  }
+  return null;
+};
+
+export const getCourses = async (options: {
+  limit?: number;
+  userId?: string;
+  searchTerm?: string;
+} = {}): Promise<Course[]> => {
+  let q = query(collection(db, 'courses'));
+  
+  if (options.userId) {
+    q = query(q, where('createdBy', '==', options.userId));
+  } else {
+    q = query(q, where('isPublic', '==', true));
+  }
+  
+  if (options.searchTerm) {
+    // Note: This is a simple contains query. For production, consider using Algolia or similar
+    // for better search capabilities
+    q = query(q, where('name', '>=', options.searchTerm));
+    q = query(q, where('name', '<=', options.searchTerm + '\uf8ff'));
+  }
+  
+  q = query(q, orderBy('name'));
+  
+  if (options.limit) {
+    q = query(q, limit(options.limit));
+  }
+  
+  const coursesSnap = await getDocs(q);
+  return coursesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
+};
+
+export const updateCourse = async (courseId: string, updates: Partial<Course>) => {
+  const courseRef = doc(db, 'courses', courseId);
+  await updateDoc(courseRef, {
+    ...updates,
+    updatedAt: new Date()
+  });
+};
+
+export const deleteCourse = async (courseId: string) => {
+  const courseRef = doc(db, 'courses', courseId);
+  await deleteDoc(courseRef);
 };
 
 // Round functions

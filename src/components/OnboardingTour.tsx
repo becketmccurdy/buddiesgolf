@@ -1,7 +1,12 @@
 import React from 'react';
 import Joyride, { CallBackProps, Step } from 'react-joyride';
 
-const OnboardingTour: React.FC = () => {
+interface OnboardingTourProps {
+  show: boolean;
+  onEnd: () => void;
+}
+
+const OnboardingTour: React.FC<OnboardingTourProps> = ({ show, onEnd }) => {
   const steps: Step[] = [
     {
       target: '.dashboard-header',
@@ -20,16 +25,21 @@ const OnboardingTour: React.FC = () => {
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status, action } = data;
     if ((status === 'finished' || status === 'skipped') && action !== 'reset') {
-      // Save completion state to localStorage or backend
-      localStorage.setItem('onboardingCompleted', 'true');
+      // Save completion state to localStorage
+      localStorage.setItem('hasSeenTour', 'true');
+      // Call the onEnd callback to hide the tour
+      onEnd();
     }
   };
+
+  if (!show) return null;
 
   return (
     <Joyride
       steps={steps}
       continuous
       showSkipButton
+      run={show}
       callback={handleJoyrideCallback}
       styles={{
         options: {

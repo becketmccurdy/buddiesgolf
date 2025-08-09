@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import ScoreInput from '../components/ScoreInput';
 import { useAuth } from '../contexts/AuthContext';
+import { useCourses } from '../contexts/CourseContext';
 import { getAllUsers, createRound, User } from '../utils/firebase';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { Combobox } from '@headlessui/react';
+import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
+import { Course } from '../utils/firebase';
 
 const NewRound: React.FC = () => {
   const navigate = useNavigate();
@@ -14,12 +18,29 @@ const NewRound: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Course selection state
+  const [searchParams] = useSearchParams();
+  const { courses, loading: coursesLoading, error: coursesError } = useCourses();
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [query, setQuery] = useState('');
+  
   // Form state
-  const [courseName, setCourseName] = useState('');
   const [roundDate, setRoundDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [holeCount, setHoleCount] = useState(18);
   const [scores, setScores] = useState<{ [uid: string]: number[] }>({});
+  
+  // Set initial course from URL params if provided
+  useEffect(() => {
+    const courseId = searchParams.get('courseId');
+    if (courseId && courses.length > 0) {
+      const course = courses.find(c => c.id === courseId);
+      if (course) {
+        setSelectedCourse(course);
+        setHoleCount(course.holes || 18);
+      }
+    }
+  }, [searchParams, courses]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -75,27 +96,31 @@ const NewRound: React.FC = () => {
     );
   };
 
-  const validateForm = () => {
-    if (!courseName.trim()) {
-      setError('Please enter a course name');
+  const validateForm = (): boolean => {
+    if (!selectedCourse) {
+      setError('Please select a course');
       return false;
     }
     
-    if (selectedPlayers.length < 2) {
-      setError('Please select at least 2 players');
+    if (selectedPlayers.length < 1) {
+      setError('Please select at least one player');
       return false;
     }
-
-    // Validate all scores are entered
-    const hasIncompleteScores = selectedPlayers.some(uid => 
-      scores[uid].some(score => score === 0)
-    );
     
-    if (hasIncompleteScores) {
-      setError('Please fill in all scores for selected players');
-      return false;
+    // Validate scores
+    for (const uid of selectedPlayers) {
+      if (!scores[uid] || scores[uid].length === 0) {
+        setError('Please enter scores for all selected players');
+        return false;
+      }
+      
+      // Check for any unset scores (0 is a valid score)
+      if (scores[uid].some(score => score === null || score === undefined)) {
+        setError('Please enter a valid score for all holes');
+        return false;
+      }
     }
-
+    
     return true;
   };
 
@@ -112,14 +137,19 @@ const NewRound: React.FC = () => {
     try {
       const winner = getWinner();
       const roundData = {
-        course: courseName.trim(),
+        courseId: selectedCourse.id!,
+        courseName: selectedCourse.name,
+        course: selectedCourse,
         date: roundDate,
         players: selectedPlayers,
         scores: selectedPlayers.map(uid => ({
           uid,
           holes: scores[uid]
         })),
-        winner: winner.uid
+        winner: winner.uid,
+        holeCount: selectedCourse.holes || 18,
+        par: selectedCourse.par || 72,
+        location: selectedCourse.location
       };
 
       await createRound(roundData);
@@ -142,7 +172,15 @@ const NewRound: React.FC = () => {
     return user?.photoURL;
   };
 
-  if (loading) {
+  // Filter courses based on search query
+  const filteredCourses = query === ''
+    ? courses
+    : courses.filter((course) => {
+        return course.name.toLowerCase().includes(query.toLowerCase()) ||
+               (course.location?.address && course.location.address.toLowerCase().includes(query.toLowerCase()));
+      });
+
+  if (loading || coursesLoading) {
     return <LoadingSpinner />;
   }
 
@@ -185,43 +223,151 @@ const NewRound: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Info */}
-          <div className="card hover:shadow-lg transition-all duration-300">
+          {/* Course Selection */}
+          <div className="card hover:shadow-lg transition-all duration-300 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-              <span className="mr-2">📋</span>
-              Round Details
+              <span className="mr-2">🏌️</span>
+              Course Selection
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label htmlFor="course" className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Name *
-                </label>
-                <input
-                  id="course"
-                  type="text"
-                  value={courseName}
-                  onChange={(e) => setCourseName(e.target.value)}
-                  placeholder="e.g., Pebble Beach Golf Links"
-                  className="input-field focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  required
-                />
+            
+            <div className="mb-6">
+              <label htmlFor="course" className="block text-sm font-medium text-gray-700 mb-1">
+                Select Course <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Combobox value={selectedCourse} onChange={setSelectedCourse}>
+                  <div className="relative">
+                    <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 focus-visible:ring-offset-2 focus-visible:ring-offset-green-300 sm:text-sm">
+                      <Combobox.Input
+                        className="w-full border border-gray-300 rounded-md py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        displayValue={(course: Course) => course?.name || ''}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search courses..."
+                      />
+                      <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                        <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                      </Combobox.Button>
+                    </div>
+                    <Combobox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm z-10">
+                      {filteredCourses.length === 0 && query !== '' ? (
+                        <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
+                          No courses found. <button
+                            type="button"
+                            onClick={() => navigate('/courses/new')}
+                            className="text-green-600 hover:text-green-800 font-medium"
+                          >
+                            Add new course
+                          </button>
+                        </div>
+                      ) : (
+                        filteredCourses.map((course) => (
+                          <Combobox.Option
+                            key={course.id}
+                            className={({ active }) =>
+                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                active ? 'bg-green-100 text-green-900' : 'text-gray-900'
+                              }`
+                            }
+                            value={course}
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                  {course.name}
+                                  {course.location?.address && (
+                                    <span className="text-xs text-gray-500 block truncate">
+                                      {course.location.address}
+                                    </span>
+                                  )}
+                                </span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-green-600">
+                                    <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Combobox.Option>
+                        ))
+                      )}
+                    </Combobox.Options>
+                  </div>
+                </Combobox>
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/courses/new')}
+                    className="text-sm text-green-600 hover:text-green-800 font-medium"
+                  >
+                    + Add New Course
+                  </button>
+                </div>
               </div>
+              
+              {selectedCourse && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{selectedCourse.name}</h3>
+                      {selectedCourse.location?.address && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {selectedCourse.location.address}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/courses/${selectedCourse.id}`)}
+                      className="text-sm text-green-600 hover:text-green-800"
+                    >
+                      View Details
+                    </button>
+                  </div>
+                  
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Holes:</span>{' '}
+                      <span className="font-medium">{selectedCourse.holes || 18}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Par:</span>{' '}
+                      <span className="font-medium">{selectedCourse.par || 72}</span>
+                    </div>
+                    {selectedCourse.rating && (
+                      <div>
+                        <span className="text-gray-500">Rating:</span>{' '}
+                        <span className="font-medium">{selectedCourse.rating}</span>
+                      </div>
+                    )}
+                    {selectedCourse.slope && (
+                      <div>
+                        <span className="text-gray-500">Slope:</span>{' '}
+                        <span className="font-medium">{selectedCourse.slope}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
-                  Date *
+                  Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="date"
                   type="date"
                   value={roundDate}
                   onChange={(e) => setRoundDate(e.target.value)}
-                  className="input-field focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="input-field focus:ring-2 focus:ring-green-500 focus:border-transparent w-full"
                   required
                 />
               </div>
+              
               <div>
-                <label htmlFor="holes" className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Holes
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Holes <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="holes"
@@ -292,7 +438,7 @@ const NewRound: React.FC = () => {
           </div>
 
           {/* Scoring */}
-          {selectedPlayers.length >= 2 && (
+          {selectedPlayers.length >= 1 && (
             <div className="card hover:shadow-lg transition-all duration-300">
               <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
                 <span className="mr-2">📊</span>
@@ -385,7 +531,7 @@ const NewRound: React.FC = () => {
             </button>
             <button
               type="submit"
-              disabled={saving || selectedPlayers.length < 2}
+              disabled={saving || selectedPlayers.length < 1}
               className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               {saving ? (
