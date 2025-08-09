@@ -80,7 +80,8 @@ const CourseForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
     }));
   };
 
-  const handleLocationSelect = (place: google.maps.places.PlaceResult) => {
+  const handleLocationSelect = (place: google.maps.places.PlaceResult | null) => {
+    if (!place) return;
     if (!place.geometry || !place.geometry.location) {
       setMapError('Could not find location. Please try again.');
       return;

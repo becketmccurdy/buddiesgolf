@@ -47,24 +47,7 @@ declare namespace google.maps {
   }
 
   namespace places {
-    interface PlaceResult {
-      address_components?: AddressComponent[];
-      formatted_address?: string;
-      geometry?: {
-        location: google.maps.LatLng;
-        viewport: google.maps.LatLngBounds;
-      };
-      name?: string;
-      formatted_phone_number?: string;
-      international_phone_number?: string;
-      website?: string;
-      rating?: number;
-      user_ratings_total?: number;
-      types?: string[];
-      url?: string;
-      vicinity?: string;
-      [key: string]: any;
-    }
+    // PlaceResult is now defined in the outer scope
 
     class PlacesService {
       constructor(attrContainer: HTMLElement | Map);
@@ -92,7 +75,25 @@ declare namespace google.maps {
     country: string | string[];
   }
 
-  // Moved PlaceResult interface inside the google.maps.places namespace
+  // PlaceResult interface
+  interface PlaceResult {
+    address_components?: AddressComponent[];
+    formatted_address?: string;
+    geometry?: {
+      location: LatLng;
+      viewport: LatLngBounds;
+    };
+    name?: string;
+    formatted_phone_number?: string;
+    international_phone_number?: string;
+    website?: string;
+    rating?: number;
+    user_ratings_total?: number;
+    types?: string[];
+    url?: string;
+    vicinity?: string;
+    [key: string]: any;
+  }
 
   interface AddressComponent {
     long_name: string;
